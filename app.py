@@ -3,18 +3,10 @@ import numpy as np
 import os
 import datetime
 import pandas as pd
-import json
-from keras.models import load_model
+import h5py
+from keras.models import model_from_json
+from keras.optimizers import RMSprop
 import seq2tensor
-
-# 🔧 Patch keras untuk error 'str' object has no attribute 'decode'
-original_json_loads = json.loads
-def safe_loads(s):
-    try:
-        return original_json_loads(s.decode('utf-8'))
-    except AttributeError:
-        return original_json_loads(s)
-json.loads = safe_loads
 
 # Konfigurasi
 seq_size = 4000
@@ -26,9 +18,15 @@ log_file = "riwayat_log.txt"
 
 st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
 
-# Load model
+# Load model dari HDF5 (.h5) secara manual
 if os.path.exists(model_path):
-    model = load_model(model_path)
+    with h5py.File(model_path, 'r') as f:
+        model_config = f.attrs.get('model_config')
+        if isinstance(model_config, bytes):
+            model_config = model_config.decode('utf-8')
+        model = model_from_json(model_config)
+        model.load_weights(model_path)
+        model.compile(optimizer=RMSprop(), loss='categorical_crossentropy', metrics=['accuracy'])
 
 # Load embedding
 if os.path.exists(embedding_path):
