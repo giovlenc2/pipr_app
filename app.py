@@ -3,8 +3,18 @@ import numpy as np
 import os
 import datetime
 import pandas as pd
+import json
 from keras.models import load_model
 import seq2tensor
+
+# 🔧 Patch keras untuk error 'str' object has no attribute 'decode'
+original_json_loads = json.loads
+def safe_loads(s):
+    try:
+        return original_json_loads(s.decode('utf-8'))
+    except AttributeError:
+        return original_json_loads(s)
+json.loads = safe_loads
 
 # Konfigurasi
 seq_size = 4000
