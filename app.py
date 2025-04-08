@@ -14,7 +14,7 @@ sequence_file = "output_sequences.tsv"
 model_path = "best_model_overall.h5"
 log_file = "riwayat_log.txt"
 
-st.title("🧬 Prediksi Interaksi Protein-Protein (PIPR)")
+st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
 
 # Load model
 if os.path.exists(model_path):
