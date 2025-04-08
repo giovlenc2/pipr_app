@@ -5,24 +5,20 @@ import datetime
 import pandas as pd
 from keras.models import model_from_json
 from keras.optimizers import RMSprop
-import keras.engine.saving
 import seq2tensor
 
-# === PATCH Aman: Hindari error 'str' object has no attribute 'decode' ===
-original_loader = keras.engine.saving.load_weights_from_hdf5_group
+# === FIX: Patch keras + h5py agar gak error .decode() ===
+import h5py
 
-def safe_loader(f, layers, **kwargs):
-    try:
-        # Baca keras_version dan backend tanpa decode jika sudah str
-        if isinstance(f.attrs.get('keras_version'), bytes):
-            _ = f.attrs['keras_version'].decode('utf-8')
-        if isinstance(f.attrs.get('backend'), bytes):
-            _ = f.attrs['backend'].decode('utf-8')
-    except Exception:
-        pass
-    return original_loader(f, layers, **kwargs)
+original_getitem = h5py.AttributeManager.__getitem__
 
-keras.engine.saving.load_weights_from_hdf5_group = safe_loader
+def safe_getitem(self, key):
+    out = original_getitem(self, key)
+    if key in ('keras_version', 'backend') and isinstance(out, str):
+        return out.encode('utf-8')  # keras expects bytes so it can decode
+    return out
+
+h5py.AttributeManager.__getitem__ = safe_getitem
 
 # === Konfigurasi ===
 seq_size = 4000
@@ -40,7 +36,7 @@ if os.path.exists("model.json") and os.path.exists("model_weights.h5"):
     model.load_weights("model_weights.h5")
     model.compile(optimizer=RMSprop(), loss='categorical_crossentropy', metrics=['accuracy'])
 else:
-    st.error("❌ Model file tidak ditemukan.")
+    st.error("❌ File model tidak ditemukan.")
 
 # === Load embedding ===
 if os.path.exists(embedding_path):
