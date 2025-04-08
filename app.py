@@ -3,61 +3,41 @@ import numpy as np
 import os
 import datetime
 import pandas as pd
-import h5py
-import json
-import keras.engine.saving
 from keras.models import model_from_json
 from keras.optimizers import RMSprop
 import seq2tensor
-
-# 🛠️ PATCH 1 – json.loads decode bypass
-original_json_loads = json.loads
-def safe_loads(s):
-    try:
-        return original_json_loads(s.decode('utf-8'))
-    except AttributeError:
-        return original_json_loads(s)
-json.loads = safe_loads
-
-# 🛠️ PATCH 2 – load_weights decode bypass
-original_loader = keras.engine.saving.load_weights_from_hdf5_group
-def safe_load_weights(f, layers, **kwargs):
-    if isinstance(f.attrs['keras_version'], bytes):
-        f.attrs.modify('keras_version', f.attrs['keras_version'].decode('utf-8'))
-    if isinstance(f.attrs['backend'], bytes):
-        f.attrs.modify('backend', f.attrs['backend'].decode('utf-8'))
-    return original_loader(f, layers, **kwargs)
-keras.engine.saving.load_weights_from_hdf5_group = safe_load_weights
 
 # Konfigurasi
 seq_size = 4000
 embedding_dim = 12
 embedding_path = "string_vec12.txt"
 sequence_file = "output_sequences.tsv"
-model_path = "best_model_overall.h5"
 log_file = "riwayat_log.txt"
 
 st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
 
-# Load model dari HDF5 (.h5) secara manual
-if os.path.exists(model_path):
-    with h5py.File(model_path, 'r') as f:
-        model_config = f.attrs.get('model_config')
-        if isinstance(model_config, bytes):
-            model_config = model_config.decode('utf-8')
-        model = model_from_json(model_config)
-        model.load_weights(model_path)
-        model.compile(optimizer=RMSprop(), loss='categorical_crossentropy', metrics=['accuracy'])
+# Load model dari JSON + weights
+if os.path.exists("model.json") and os.path.exists("model_weights.h5"):
+    with open("model.json", "r") as json_file:
+        model = model_from_json(json_file.read())
+    model.load_weights("model_weights.h5")
+    model.compile(optimizer=RMSprop(), loss='categorical_crossentropy', metrics=['accuracy'])
+else:
+    st.error("Model file tidak ditemukan.")
 
 # Load embedding
 if os.path.exists(embedding_path):
     embedding_model = seq2tensor.s2t(embedding_path)
     embedding_model.dim = embedding_dim
+else:
+    st.error("File embedding tidak ditemukan.")
 
 # Load sekuens protein
 if os.path.exists(sequence_file):
     df_seq = pd.read_csv(sequence_file, sep="\t", header=None)
     id_to_seq = dict(zip(df_seq[0], df_seq[1]))
+else:
+    st.error("File sekuens protein tidak ditemukan.")
 
 # Load riwayat dari file (jika ada)
 if os.path.exists(log_file):
