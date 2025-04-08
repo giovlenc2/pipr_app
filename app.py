@@ -7,35 +7,49 @@ from keras.models import model_from_json
 from keras.layers import GRU
 import seq2tensor
 
-# Konfigurasi
+# === PATCH: Fix keras_version decode error in keras + h5py modern ===
+import h5py
+
+original_getitem = h5py.AttributeManager.__getitem__
+
+def patched_getitem(self, key):
+    out = original_getitem(self, key)
+    if key in ('keras_version', 'backend') and isinstance(out, str):
+        return out.encode('utf-8')  # keras expects bytes, not str
+    return out
+
+h5py.AttributeManager.__getitem__ = patched_getitem
+
+# === Konfigurasi ===
 seq_size = 4000
 embedding_dim = 12
 embedding_path = "string_vec12.txt"
 sequence_file = "output_sequences.tsv"
 log_file = "riwayat_log.txt"
 
-# ====== Load Model dari JSON dan Weights (CPU Friendly) ======
+st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
+
+# === Load model dari JSON + Weights (CPU Friendly) ===
 with open("model.json", "r") as f:
     model = model_from_json(f.read(), custom_objects={"CuDNNGRU": GRU})
 model.load_weights("model_weights.h5")
 
-# ====== Load Embedding & Mapping ======
+# === Load Embedding ===
 embedding_model = seq2tensor.s2t(embedding_path)
 embedding_model.dim = embedding_dim
 
+# === Load Sequences ===
 df_seq = pd.read_csv(sequence_file, sep="\t", header=None)
 id_to_seq = dict(zip(df_seq[0], df_seq[1]))
 
-# ====== Riwayat ======
+# === Riwayat Prediksi ===
 if os.path.exists(log_file):
     with open(log_file, "r", encoding="utf-8") as f:
         history = [line.strip() for line in f.readlines() if line.strip()]
 else:
     history = []
 
-# ====== Streamlit App ======
-st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
-
+# === Input ID Pasangan Protein ===
 st.subheader("🧾 Masukkan ID Pasangan Protein (pisahkan dengan koma atau baris)")
 user_input = st.text_area("Contoh:\n9606.ENSP00000232892, 9606.ENSP00000353720\n9606.ENSP00000298492, 9606.ENSP00000352408")
 
@@ -50,11 +64,10 @@ if st.button("🔍 Prediksi"):
                 st.warning(f"❗ ID tidak ditemukan: {id1} atau {id2}")
                 continue
 
-            # Embedding
+            # Embedding & padding
             t1 = embedding_model.embed(seq1)
             t2 = embedding_model.embed(seq2)
 
-            # Padding
             t1 = np.pad(t1[:, :embedding_dim], ((0, max(0, seq_size - len(t1))), (0, 0)), mode='constant')[:seq_size]
             t2 = np.pad(t2[:, :embedding_dim], ((0, max(0, seq_size - len(t2))), (0, 0)), mode='constant')[:seq_size]
 
@@ -78,14 +91,14 @@ if st.button("🔍 Prediksi"):
         for line in history:
             f.write(line + "\n")
 
-# ====== Tombol Hapus Riwayat ======
+# === Hapus Riwayat ===
 if st.button("🗑️ Hapus Riwayat"):
     history = []
     if os.path.exists(log_file):
         os.remove(log_file)
     st.success("Riwayat berhasil dihapus.")
 
-# ====== Tampilkan Riwayat ======
+# === Tampilkan Riwayat ===
 if history:
     st.markdown("---")
     st.markdown("### 📜 Riwayat Prediksi")
