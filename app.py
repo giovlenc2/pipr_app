@@ -8,14 +8,18 @@ from keras.optimizers import RMSprop
 import keras.engine.saving
 import seq2tensor
 
-# === PATCH: Hindari error 'str' object has no attribute 'decode' ===
+# === PATCH Aman: Hindari error 'str' object has no attribute 'decode' ===
 original_loader = keras.engine.saving.load_weights_from_hdf5_group
 
 def safe_loader(f, layers, **kwargs):
-    if isinstance(f.attrs.get('keras_version'), bytes):
-        f.attrs.modify('keras_version', f.attrs['keras_version'].decode('utf-8'))
-    if isinstance(f.attrs.get('backend'), bytes):
-        f.attrs.modify('backend', f.attrs['backend'].decode('utf-8'))
+    try:
+        # Baca keras_version dan backend tanpa decode jika sudah str
+        if isinstance(f.attrs.get('keras_version'), bytes):
+            _ = f.attrs['keras_version'].decode('utf-8')
+        if isinstance(f.attrs.get('backend'), bytes):
+            _ = f.attrs['backend'].decode('utf-8')
+    except Exception:
+        pass
     return original_loader(f, layers, **kwargs)
 
 keras.engine.saving.load_weights_from_hdf5_group = safe_loader
