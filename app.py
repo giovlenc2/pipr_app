@@ -5,9 +5,22 @@ import datetime
 import pandas as pd
 from keras.models import model_from_json
 from keras.optimizers import RMSprop
+import keras.engine.saving
 import seq2tensor
 
-# Konfigurasi
+# === PATCH: Hindari error 'str' object has no attribute 'decode' ===
+original_loader = keras.engine.saving.load_weights_from_hdf5_group
+
+def safe_loader(f, layers, **kwargs):
+    if isinstance(f.attrs.get('keras_version'), bytes):
+        f.attrs.modify('keras_version', f.attrs['keras_version'].decode('utf-8'))
+    if isinstance(f.attrs.get('backend'), bytes):
+        f.attrs.modify('backend', f.attrs['backend'].decode('utf-8'))
+    return original_loader(f, layers, **kwargs)
+
+keras.engine.saving.load_weights_from_hdf5_group = safe_loader
+
+# === Konfigurasi ===
 seq_size = 4000
 embedding_dim = 12
 embedding_path = "string_vec12.txt"
@@ -16,37 +29,37 @@ log_file = "riwayat_log.txt"
 
 st.title("🧬 Prediksi Interaksi Protein dengan Metode PIPR")
 
-# Load model dari JSON + weights
+# === Load model dari JSON + Weights ===
 if os.path.exists("model.json") and os.path.exists("model_weights.h5"):
     with open("model.json", "r") as json_file:
         model = model_from_json(json_file.read())
     model.load_weights("model_weights.h5")
     model.compile(optimizer=RMSprop(), loss='categorical_crossentropy', metrics=['accuracy'])
 else:
-    st.error("Model file tidak ditemukan.")
+    st.error("❌ Model file tidak ditemukan.")
 
-# Load embedding
+# === Load embedding ===
 if os.path.exists(embedding_path):
     embedding_model = seq2tensor.s2t(embedding_path)
     embedding_model.dim = embedding_dim
 else:
-    st.error("File embedding tidak ditemukan.")
+    st.error("❌ File embedding tidak ditemukan.")
 
-# Load sekuens protein
+# === Load sekuens protein ===
 if os.path.exists(sequence_file):
     df_seq = pd.read_csv(sequence_file, sep="\t", header=None)
     id_to_seq = dict(zip(df_seq[0], df_seq[1]))
 else:
-    st.error("File sekuens protein tidak ditemukan.")
+    st.error("❌ File sekuens protein tidak ditemukan.")
 
-# Load riwayat dari file (jika ada)
+# === Load riwayat (jika ada) ===
 if os.path.exists(log_file):
     with open(log_file, "r", encoding="utf-8") as f:
         history = [line.strip() for line in f.readlines() if line.strip()]
 else:
     history = []
 
-# Input ID pasangan protein
+# === Input ID Pasangan Protein ===
 st.subheader("🧾 Masukkan ID Pasangan Protein (pisahkan dengan koma)")
 user_input = st.text_input("Contoh: 9606.ENSP00000232892, 9606.ENSP00000353720")
 
@@ -70,13 +83,13 @@ if st.button("🔍 Prediksi"):
             t2 = np.expand_dims(t2, axis=0)
 
             output = model.predict([t1, t2])[0]
-            interaksi_prob = output[0]  # Karena softmax[0] = interaksi
+            interaksi_prob = output[0]
             label = "Interaksi" if interaksi_prob >= 0.5 else "Tidak Berinteraksi"
 
             timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
             result = f"{timestamp} {id1} - {id2} ➜ {label} (Skor: {interaksi_prob:.4f})"
 
-            # Simpan ke riwayat dan tampilkan
+            # Simpan & tampilkan
             history.insert(0, result)
             with open(log_file, "w", encoding="utf-8") as f:
                 for line in history:
@@ -87,14 +100,14 @@ if st.button("🔍 Prediksi"):
     except:
         st.error("❌ Format input tidak valid. Harap pisahkan dengan koma.")
 
-# Tombol hapus riwayat
+# === Hapus Riwayat ===
 if st.button("🗑️ Hapus Riwayat"):
     history = []
     if os.path.exists(log_file):
         os.remove(log_file)
     st.success("Riwayat berhasil dihapus.")
 
-# Tampilkan riwayat
+# === Tampilkan Riwayat ===
 if history:
     st.markdown("---")
     st.markdown("### 📜 Riwayat Prediksi")
