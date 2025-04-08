@@ -4,9 +4,30 @@ import os
 import datetime
 import pandas as pd
 import h5py
+import json
+import keras.engine.saving
 from keras.models import model_from_json
 from keras.optimizers import RMSprop
 import seq2tensor
+
+# 🛠️ PATCH 1 – json.loads decode bypass
+original_json_loads = json.loads
+def safe_loads(s):
+    try:
+        return original_json_loads(s.decode('utf-8'))
+    except AttributeError:
+        return original_json_loads(s)
+json.loads = safe_loads
+
+# 🛠️ PATCH 2 – load_weights decode bypass
+original_loader = keras.engine.saving.load_weights_from_hdf5_group
+def safe_load_weights(f, layers, **kwargs):
+    if isinstance(f.attrs['keras_version'], bytes):
+        f.attrs.modify('keras_version', f.attrs['keras_version'].decode('utf-8'))
+    if isinstance(f.attrs['backend'], bytes):
+        f.attrs.modify('backend', f.attrs['backend'].decode('utf-8'))
+    return original_loader(f, layers, **kwargs)
+keras.engine.saving.load_weights_from_hdf5_group = safe_load_weights
 
 # Konfigurasi
 seq_size = 4000
