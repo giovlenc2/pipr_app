@@ -1,7 +1,8 @@
+pip>=21.3
 streamlit==1.40.1
 tensorflow-macos==2.10.0
 tensorflow-metal==1.0.1
+keras==2.10.0
 seq2tensor
 pandas
 numpy
-keras
