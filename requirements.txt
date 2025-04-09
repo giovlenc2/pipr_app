@@ -1,4 +1,5 @@
 streamlit==1.40.1
-tensorflow==2.10.0
+tensorflow==2.13.0
 keras==2.10.0
-protobuf==3.19.6  # Make sure this version satisfies both Streamlit and TensorFlow
+protobuf>=3.20,<6
+altair<6,>=4.0
