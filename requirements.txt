@@ -1,5 +1,5 @@
 streamlit==1.40.1
-tensorflow-macos==2.10.0
+tensorflow-macos==2.8.0
 tensorflow-metal==1.0.1
 keras==2.10.0
 seq2tensor
