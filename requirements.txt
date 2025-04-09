@@ -1,6 +1,5 @@
 streamlit==1.40.1
 tensorflow==2.8.0
 keras==2.10.0
-seq2tensor
 pandas
 numpy
