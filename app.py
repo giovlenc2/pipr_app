@@ -46,7 +46,11 @@ else:
 
 # Input ID pasangan protein
 st.subheader("🧾 Masukkan ID Pasangan Protein (pisahkan dengan koma per pasangan)")
-user_input = st.text_area("Contoh: 9606.ENSP00000232892, 9606.ENSP00000353720\n9606.ENSP00000232892, 9606.ENSP00000353500")
+user_input = st.text_area(
+    "📝 Masukkan ID Pasangan Protein",
+    help="Pisahkan dua ID protein dalam satu pasangan dengan koma (,) dan pisahkan setiap pasangan dengan baris baru (enter).\n\nContoh:\n9606.ENSP00000232892, 9606.ENSP00000353720\n9606.ENSP00000232892, 9606.ENSP00000353500"
+)
+
 
 if st.button("🔍 Prediksi"):
     try:
