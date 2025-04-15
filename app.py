@@ -3,7 +3,9 @@ import numpy as np
 import os
 import datetime
 import pandas as pd
+import tensorflow as tf
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import GRU  # Import GRU untuk mapping ke CuDNNGRU
 import seq2tensor
 
 # Konfigurasi
@@ -16,9 +18,12 @@ log_file = "riwayat_log.txt"
 
 st.title("🧬 Prediksi Interaksi Protein-Protein (PIPR)")
 
-# Load model
+# Jika memang hanya CPU yang tersedia, tetap pakai env variable ini
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Paksa penggunaan CPU
+
+# Load model dengan custom_objects untuk menggantikan CuDNNGRU ke GRU (CPU-friendly)
 if os.path.exists(model_path):
-    model = load_model(model_path)
+    model = load_model(model_path, custom_objects={'CuDNNGRU': GRU})
 
 # Load embedding
 if os.path.exists(embedding_path):
@@ -29,6 +34,8 @@ if os.path.exists(embedding_path):
 if os.path.exists(sequence_file):
     df_seq = pd.read_csv(sequence_file, sep="\t", header=None)
     id_to_seq = dict(zip(df_seq[0], df_seq[1]))
+else:
+    id_to_seq = {}
 
 # Load riwayat dari file (jika ada)
 if os.path.exists(log_file):
@@ -38,18 +45,27 @@ else:
     history = []
 
 # Input ID pasangan protein
-st.subheader("🧾 Masukkan ID Pasangan Protein (pisahkan dengan koma)")
-user_input = st.text_input("Contoh: 9606.ENSP00000232892, 9606.ENSP00000353720")
+st.subheader("🧾 Masukkan ID Pasangan Protein (pisahkan dengan koma per pasangan)")
+user_input = st.text_area("Contoh: 9606.ENSP00000232892, 9606.ENSP00000353720\n9606.ENSP00000232892, 9606.ENSP00000353500")
 
 if st.button("🔍 Prediksi"):
     try:
-        id1, id2 = [x.strip() for x in user_input.split(",")]
-        seq1 = id_to_seq.get(id1)
-        seq2 = id_to_seq.get(id2)
+        input_lines = user_input.strip().split("\n")  # Split input by newlines
+        for line in input_lines:
+            pair = [x.strip() for x in line.split(",")]  # Split pair by koma
 
-        if not seq1 or not seq2:
-            st.warning("❗ Salah satu ID protein tidak ditemukan.")
-        else:
+            if len(pair) != 2:
+                st.warning(f"❗ Format salah: {line}. Harap pisahkan dengan koma.")
+                continue
+
+            id1, id2 = pair
+            seq1 = id_to_seq.get(id1)
+            seq2 = id_to_seq.get(id2)
+
+            if not seq1 or not seq2:
+                st.warning(f"❗ Salah satu ID protein {id1} atau {id2} tidak ditemukan.")
+                continue
+
             # Embedding & padding
             t1 = embedding_model.embed(seq1)
             t2 = embedding_model.embed(seq2)
@@ -75,8 +91,8 @@ if st.button("🔍 Prediksi"):
 
             st.success(result)
 
-    except:
-        st.error("❌ Format input tidak valid. Harap pisahkan dengan koma.")
+    except Exception as e:
+        st.error(f"❌ Error: {e}")
 
 # Tombol hapus riwayat
 if st.button("🗑️ Hapus Riwayat"):
